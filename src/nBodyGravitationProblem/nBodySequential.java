@@ -7,7 +7,13 @@ public class nBodySequential {
 		double bodySize = Double.parseDouble(args[2]); // diameter
 		int numTimeSteps = Integer.parseInt(args[3]);
 		
+		System.out.println("************************");
+		System.out.println("Parameters:");
+		System.out.println("numWorkers: " + numWorkers);
 		System.out.println("numBodies: " + numBodies);
+		System.out.println("bodySize(diameter): " + bodySize);
+		System.out.println("numTimeSteps: " + numTimeSteps);
+		System.out.println("************************");
 		
 		SequentialHandler s = new SequentialHandler(numBodies, numTimeSteps, bodySize, 10);
 		s.run();
