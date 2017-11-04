@@ -16,7 +16,7 @@ public class nBodySequential {
 		System.out.println("radius: " + bodySize/2);
 		System.out.println("************************");
 		
-		SequentialHandler s = new SequentialHandler(numBodies, numTimeSteps, bodySize, 33);
+		SequentialHandler s = new SequentialHandler(numBodies, numTimeSteps, bodySize);
 		s.run();
 	}
 }

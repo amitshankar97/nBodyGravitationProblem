@@ -1,5 +1,8 @@
 package nBodyGravitationProblem;
 
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+
 public class Point {
     double x, y;
     
@@ -27,6 +30,8 @@ public class Point {
     }
     
     public String toString() {
-	return "(" + x + ", " + y + ")";
+	DecimalFormat df = new DecimalFormat("#.##");
+	df.setRoundingMode(RoundingMode.CEILING);
+	return df.format(x) + "," + df.format(y) + ",,";
     }
 }
