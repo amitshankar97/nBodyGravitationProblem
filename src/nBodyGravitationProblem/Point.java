@@ -23,10 +23,26 @@ public class Point {
     public double getY() {
 	return y;
     }
+
+    public void setX(double a) {
+	this.x = a;
+    }
+
+    public void setY(double a) {
+	this.y = a;
+    }
     
     public void setLocation(double a, double b) {
 	x = a;
 	y = b;
+    }
+    
+    public void addToX(double a) {
+	x += a;
+    }
+
+    public void addToY(double a) {
+	y += a;
     }
     
     public String toString() {
