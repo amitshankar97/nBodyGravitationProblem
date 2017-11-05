@@ -3,6 +3,7 @@ package nBodyGravitationProblem;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Random;
 
 public class SequentialHandler {
@@ -14,27 +15,30 @@ public class SequentialHandler {
     int PLANE_SIZE = 0;
 
 
-    final double timeStep = 0.1;
+    final double timeStep = .1;
     private Random rand = new Random();
     private Point position[];
     private Point velocity[];
     private Point force[];
     private double bodySize;
     private double radius;
+    
+    private ArrayList<Integer> collisions;
 
     private int round = 0;
 
     BufferedWriter positionWriter;
     BufferedWriter collisionWriter;
     
+    nBodyVisual artist;
+    
     private int collisionCtr = 0;
-
-    // private int spacingBetweenColumns;
 
     public SequentialHandler(int numObjects, int numTimeSteps, double bodySize) {
 	this.numObjects = numObjects;
 	this.numTimeSteps = numTimeSteps;
 	this.bodySize = bodySize;
+	this.collisions = new ArrayList<Integer>();
 
 	PLANE_SIZE = (int) (numObjects * bodySize * 2);
 	System.out.println("PLANE_SIZE: " + PLANE_SIZE);
@@ -55,7 +59,6 @@ public class SequentialHandler {
 
 		int x = rand.nextInt(PLANE_SIZE-roundedRadius);
 		int y = rand.nextInt(PLANE_SIZE-roundedRadius);
-
 
 
 		boolean acceptable = true;
@@ -92,8 +95,10 @@ public class SequentialHandler {
 	    
 	    force[i] = new Point();
 	}
+	
 
-	// TODO: Write object locations to file
+	artist = new nBodyVisual(1, bodySize, numObjects, position);
+
 	try {
 	    positionWriter = new BufferedWriter(new FileWriter("nBodySeq.csv"));
 	    collisionWriter = new BufferedWriter(new FileWriter("collisionLog.csv"));
@@ -183,6 +188,8 @@ public class SequentialHandler {
 		if(dist <= bodySize) {
 		    System.out.println("");
 		    System.out.println("******COLLISION occurred between " + i + " and " + j + " *******");
+		    collisions.add(i);
+		    collisions.add(j);
 		    try {
 			collisionWriter.write("\n" + round + "," + i + "," + j + "," + dist + "," + position[i].getX() + "," + 
 		    position[j].getX() + "," + position[i].getY() + "," + position[j].getY());
@@ -340,6 +347,14 @@ public class SequentialHandler {
 	for (int i = 0; i < numTimeSteps; i++) {
 	    calculateForces();
 	    moveBodies();
+	    artist.draw(position, collisions);
+	    collisions.clear();
+	    try {
+		Thread.sleep(100);
+	    } catch(InterruptedException e) {
+		e.printStackTrace();
+	    }
+	    
 	    round++;
 
 	    String str = "\n" + i + ",,";
