@@ -11,10 +11,10 @@ public class SequentialHandler {
     double mass;
 
     final double GRAV_CONSTANT = 6.67 * (10^(-11));
-    final int PLANE_SIZE = 100;
+    int PLANE_SIZE = 0;
 
 
-    final double timeStep = 1;
+    final double timeStep = 0.1;
     private Random rand = new Random();
     private Point position[];
     private Point velocity[];
@@ -23,9 +23,12 @@ public class SequentialHandler {
     private double radius;
 
     private int round = 0;
+
+    BufferedWriter positionWriter;
+    BufferedWriter collisionWriter;
     
-    BufferedWriter writer;
-    
+    private int collisionCtr = 0;
+
     // private int spacingBetweenColumns;
 
     public SequentialHandler(int numObjects, int numTimeSteps, double bodySize) {
@@ -33,28 +36,37 @@ public class SequentialHandler {
 	this.numTimeSteps = numTimeSteps;
 	this.bodySize = bodySize;
 
+	PLANE_SIZE = (int) (numObjects * bodySize * 2);
+	System.out.println("PLANE_SIZE: " + PLANE_SIZE);
+
 	position = new Point[numObjects];
 	velocity = new Point[numObjects];
 	force = new Point[numObjects];
 
 	mass = (double) rand.nextInt(100);
+	System.out.println("Mass: " + mass);
+	
 	radius = bodySize/2;
 
 	for (int i = 0; i < numObjects; i++) {
 	    while (true) {
-		int temp = (int) Math.round(radius);
-		temp++;
+		int roundedRadius = (int) Math.round(radius);
+		roundedRadius++;
 
-		int x = rand.nextInt(PLANE_SIZE-temp);
-		int y = rand.nextInt(PLANE_SIZE-temp);
+		int x = rand.nextInt(PLANE_SIZE-roundedRadius);
+		int y = rand.nextInt(PLANE_SIZE-roundedRadius);
 
 
 
 		boolean acceptable = true;
 		for (int j = 0; j < i; j++) {
-		    boolean isBetweenX = (x <= position[j].getX()+temp && x >= position[j].getX()-temp);
-		    boolean isBetweenY = (y <= position[j].getY()+temp && y >= position[j].getY()-temp);
-		    if (isBetweenX || isBetweenY)
+		    boolean isBetweenX = (x <= position[j].getX()+roundedRadius && x >= position[j].getX()-roundedRadius);
+		    boolean isBetweenY = (y <= position[j].getY()+roundedRadius && y >= position[j].getY()-roundedRadius);
+		    boolean isOnBorderX = (x + roundedRadius >= PLANE_SIZE || x - roundedRadius <= 0);
+		    boolean isOnBorderY = (y + roundedRadius >= PLANE_SIZE || y - roundedRadius <= 0);
+
+
+		    if (isBetweenX || isBetweenY || isOnBorderX || isOnBorderY)
 			acceptable = false;
 		}
 		if (acceptable) {
@@ -64,31 +76,52 @@ public class SequentialHandler {
 		    continue;
 		}
 	    }
-	    velocity[i] = new Point();
+	    
+	    int x = rand.nextInt(15);
+	    int y = rand.nextInt(15);
+	    
+	    int xDir = rand.nextInt(3);
+	    int yDir = rand.nextInt(3);
+	    
+	    if(xDir % 2 == 0)
+		x = 0 - x;
+	    if(yDir % 2 == 0)
+		y = 0 - y;
+	    
+	    velocity[i] = new Point(x, y);
+	    
 	    force[i] = new Point();
 	}
 
 	// TODO: Write object locations to file
 	try {
-		writer = new BufferedWriter(new FileWriter("nBodySeq.csv"));
-	    } catch(IOException e) {
-		e.printStackTrace();
-	    }
+	    positionWriter = new BufferedWriter(new FileWriter("nBodySeq.csv"));
+	    collisionWriter = new BufferedWriter(new FileWriter("collisionLog.csv"));
+	} catch(IOException e) {
+	    e.printStackTrace();
+	}
+
+	try {
+	    collisionWriter.write("Round, Object 1, Object 2");
+	} catch (IOException e1) {
+	    // TODO Auto-generated catch block
+	    e1.printStackTrace();
+	}
 	
 	String str = "Round,,";
-	
+
 	for (int i = 0; i < position.length; i++) {
 	    str += "Object " + i + ",,,";
 	}
-	
+
 	str += "\n,,";
-	
+
 	for (int i = 0; i < position.length; i++) {
 	    str += "x,y,,";
 	}
-	
+
 	try {
-	    writer.write(str);
+	    positionWriter.write(str);
 	} catch (IOException e) {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
@@ -142,8 +175,6 @@ public class SequentialHandler {
 	double dist = 0, magnitude = 0;
 	Point direction = new Point(0, 0);
 
-	// TODO: Write collision point to file
-
 	for (int i = 0; i < numObjects - 1; i++) {
 	    for (int j = i+1; j < numObjects; j++) {
 		dist = Math.sqrt(Math.pow((position[i].getX() - position[j].getX()), 2) + 
@@ -151,8 +182,61 @@ public class SequentialHandler {
 
 		if(dist <= bodySize) {
 		    System.out.println("");
-		    System.out.println("******COLLISION occurred*******");
+		    System.out.println("******COLLISION occurred between " + i + " and " + j + " *******");
+		    try {
+			collisionWriter.write("\n" + round + "," + i + "," + j + "," + dist);
+		    } catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		    }
+		    collisionCtr++;
 
+		    double deltax = position[j].getX() - position[i].getX();
+		    double deltay = position[j].getY() - position[i].getY();
+
+		    double deltaxSquared = Math.pow(deltax, 2);
+		    double deltaySquared = Math.pow(deltay, 2);
+
+		    double oneXVelocity = position[i].getX();
+		    double oneYVelocity = position[i].getY();
+
+		    double twoXVelocity = position[j].getX();
+		    double twoYVelocity = position[j].getY();
+
+		    double v1fx; // Object 1's post-collision x
+		    double v1fy; // Object 1's post-collision y
+
+		    // v1fx
+		    v1fx = (twoXVelocity * deltaxSquared + twoYVelocity * deltax * deltay +
+			    oneXVelocity * deltaySquared - oneYVelocity * deltax * deltay);
+
+		    v1fx /= deltaxSquared + deltaySquared;
+
+		    // v1fy
+		    v1fy = (twoXVelocity * deltax * deltay + twoYVelocity * deltaySquared - oneXVelocity *
+			    deltay * deltax + oneYVelocity * deltaxSquared);
+
+		    v1fy /= deltaxSquared + deltaySquared;
+
+
+		    double v2fx; // Object 2's post-collision x
+		    double v2fy; // Object 2's post-collision y
+
+		    // v2fx
+		    v2fx = (oneXVelocity * deltaxSquared + oneYVelocity * deltax * deltay +
+			    twoXVelocity * deltaySquared - twoYVelocity * deltax * deltay);
+
+		    v2fx /= deltaxSquared + deltaySquared;
+
+		    // v2fy
+		    v2fy = (oneXVelocity * deltax * deltay + oneYVelocity * deltaySquared
+			    - twoXVelocity * deltax * deltay + twoYVelocity * deltaxSquared);
+
+		    v2fy /= deltaxSquared + deltaySquared;
+		    
+		    velocity[i].setLocation(v1fx, v1fy);
+		    velocity[j].setLocation(v2fx, v2fy);
+		    
 		    System.out.println("");
 		}
 
@@ -163,14 +247,14 @@ public class SequentialHandler {
 
 		double forceX = magnitude * direction.getX() / dist;
 		double forceY = magnitude * direction.getY() / dist;
-		System.out.println("Magnitude = "+magnitude);
-		System.out.println("Distance = "+dist);
-		System.out.println("Direction = " + direction.toString());
+		// System.out.println("Magnitude = "+magnitude);
+		// System.out.println("Distance = "+dist);
+		// System.out.println("Direction = " + direction.toString());
 
 		force[i].setLocation(force[i].getX() + forceX, force[i].getY() + forceY);
 		force[j].setLocation(force[j].getX() - forceX, force[j].getY() - forceY);
-		System.out.println("ForceX: "+ forceX + ", ForceY" + forceY);
-		System.out.println("---------------------");
+		// System.out.println("ForceX: "+ forceX + ", ForceY" + forceY);
+		// System.out.println("---------------------");
 	    }
 	}
 	System.out.println("##########END###########");
@@ -194,18 +278,45 @@ public class SequentialHandler {
 	    boolean isBreakXPlane = xPosition+radius >= PLANE_SIZE || xPosition-radius <= 0;
 	    boolean isBreakYPlane = yPosition+radius >= PLANE_SIZE || yPosition-radius <= 0;
 
+	    boolean isBreakXPlaneHigh = xPosition+radius >= PLANE_SIZE; 
+	    boolean isBreakXPlaneLow  = xPosition-radius <= 0;
+	    boolean isBreakYPlaneHigh = yPosition+radius >= PLANE_SIZE; 
+	    boolean isBreakYPlaneLow =  yPosition-radius <= 0;
+		    
 	    double newXValue = xVelocity + deltavX;
 	    double newYValue = yVelocity + deltavY;
 
 	    //Check if outside of bounds, if so flip direction
 	    if (isBreakYPlane && isBreakXPlane) {
-		velocity[i].setLocation(-1*newXValue, -1*newYValue);
-		System.out.println("Object " +i+ " what is even going on.");
+		if (isBreakXPlaneHigh && xVelocity > 0) {
+		    newXValue = -1*newXValue;
+		} else if (isBreakXPlaneLow && xVelocity < 0) {
+		    newXValue = -1*newXValue;
+		}
+		
+		if (isBreakYPlaneHigh && yVelocity > 0) {
+		    newYValue = -1*newYValue;
+		} else if (isBreakYPlaneLow && yVelocity < 0) {
+		    newYValue = -1*newYValue;
+		}
+		
+		velocity[i].setLocation(newXValue, newYValue);
 	    } else if (isBreakXPlane) {
-		velocity[i].setLocation(-1*newXValue, newYValue);
+		if (isBreakXPlaneHigh && xVelocity > 0) {
+		    newXValue = -1*newXValue;
+		} else if (isBreakXPlaneLow && xVelocity < 0) {
+		    newXValue = -1*newXValue;
+		}
+		
+		velocity[i].setLocation(newXValue, newYValue);
 		System.out.println("Object " +i+ " is past x threshold and has been flipped.");
 	    } else if (isBreakYPlane) {
-		velocity[i].setLocation(newXValue, -1*newYValue);
+		if (isBreakYPlaneHigh && yVelocity > 0) {
+		    newYValue = -1*newYValue;
+		} else if (isBreakYPlaneLow && yVelocity < 0) {
+		    newYValue = -1*newYValue;
+		}
+		velocity[i].setLocation(newXValue, newYValue);
 		System.out.println("Object " +i+ " is past y threshold and has been flipped.");
 	    } else {
 		velocity[i].setLocation(newXValue, newYValue);
@@ -228,15 +339,16 @@ public class SequentialHandler {
 	for (int i = 0; i < numTimeSteps; i++) {
 	    calculateForces();
 	    moveBodies();
-	    
+	    round++;
+
 	    String str = "\n" + i + ",,";
-	    
+
 	    for (int j = 0; j < position.length; j++) {
 		str += position[j].toString();
 		// System.out.println("Location for " + j + ": (" + position[j].getX() + ", " + position[j].getY() + ")");
 	    }
 	    try {
-		writer.write(str);
+		positionWriter.write(str);
 	    } catch (IOException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
@@ -245,10 +357,12 @@ public class SequentialHandler {
 	    // System.out.println("Location for 1: (" + position[1].getX() + ", " + position[1].getY() + ")");
 	}
 	try {
-	    writer.close();
+	    positionWriter.close();
+	    collisionWriter.close();
 	} catch (IOException e) {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
 	}
+	System.out.println("Number of collisions: " + collisionCtr);
     }
 }
