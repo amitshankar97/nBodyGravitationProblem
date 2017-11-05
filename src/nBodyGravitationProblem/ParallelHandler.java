@@ -4,7 +4,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.Semaphore;
 
 public class ParallelHandler extends Thread {
 
@@ -14,7 +13,7 @@ public class ParallelHandler extends Thread {
     final double GRAV_CONSTANT = 6.67 * (10^(-11));
     int PLANE_SIZE = 0;
 
-    final double timeStep = 0.1;
+    final double timeStep = 1;
     private Random rand = new Random();
     private Point position[];
     private Point velocity[];
@@ -28,106 +27,49 @@ public class ParallelHandler extends Thread {
     private int round = 0;
 
     BufferedWriter positionWriter;
-    BufferedWriter collisionWriter;
 
     private int collisionCtr = 0;
     private Count countObject;
+    private WriteMonitor writer;
 
     // private int spacingBetweenColumns;
 
-    public ParallelHandler(int numObjects, int numTimeSteps, double bodySize, int index, int numWorkers, Count countObject) {
+    public ParallelHandler(int numObjects, int numTimeSteps, double bodySize, int index,
+	    int numWorkers, Count countObject, WriteMonitor writer, Point position[],
+	    Point[][] force, double mass, Point[] velocity) {
 	this.numObjects = numObjects;
 	this.numTimeSteps = numTimeSteps;
 	this.bodySize = bodySize;
 	this.index = index;
 	this.numWorkers = numWorkers;
 	this.countObject = countObject;
+	this.writer = writer;
+	this.position = position;
+	this.force = force;
+	this.mass = mass;
 
 	PLANE_SIZE = (int) (numObjects * bodySize * 2);
-	System.out.println("PLANE_SIZE: " + PLANE_SIZE);
 
-	position = new Point[numObjects];
-	velocity = new Point[numObjects];
-	force = new Point[numWorkers][numObjects];
+	this.velocity = velocity;
 
-	mass = (double) rand.nextInt(100);
+	this.mass = mass;
 	System.out.println("Mass: " + mass);
 
-	radius = bodySize/2;
-
-	for (int i = 0; i < numObjects; i++) {
-	    while (true) {
-		int roundedRadius = (int) Math.round(radius);
-		roundedRadius++;
-
-		int x = rand.nextInt(PLANE_SIZE-roundedRadius);
-		int y = rand.nextInt(PLANE_SIZE-roundedRadius);
-
-
-
-		boolean acceptable = true;
-		for (int j = 0; j < i; j++) {
-		    boolean isBetweenX = (x <= position[j].getX()+roundedRadius && x >= position[j].getX()-roundedRadius);
-		    boolean isBetweenY = (y <= position[j].getY()+roundedRadius && y >= position[j].getY()-roundedRadius);
-		    boolean isOnBorderX = (x + roundedRadius >= PLANE_SIZE || x - roundedRadius <= 0);
-		    boolean isOnBorderY = (y + roundedRadius >= PLANE_SIZE || y - roundedRadius <= 0);
-
-
-		    if (isBetweenX || isBetweenY || isOnBorderX || isOnBorderY)
-			acceptable = false;
-		}
-		if (acceptable) {
-		    position[i] = new Point(x, y);
-		    break;
-		} else {
-		    continue;
-		}
-	    }
-
-	    int x = rand.nextInt(15);
-	    int y = rand.nextInt(15);
-
-	    int xDir = rand.nextInt(3);
-	    int yDir = rand.nextInt(3);
-
-	    if(xDir % 2 == 0)
-		x = 0 - x;
-	    if(yDir % 2 == 0)
-		y = 0 - y;
-
-	    velocity[i] = new Point(x, y);
-	}
-
-	for (int i = 0; i < numWorkers; i++) {
-	    for (int j = 0; j < numObjects; j++) {
-		force[i][j] = new Point();
-	    }
-	}
-
-	/*
 	try {
 	    positionWriter = new BufferedWriter(new FileWriter("nBodyParallel" + index + ".csv"));
-	    collisionWriter = new BufferedWriter(new FileWriter("collisionLog" + index + ".csv"));
 	} catch(IOException e) {
 	    e.printStackTrace();
 	}
-
-	try {
-	    collisionWriter.write("Round, Object 1, Object 2, Distance, x1, x2, y1, y2");
-	} catch (IOException e1) {
-	    // TODO Auto-generated catch block
-	    e1.printStackTrace();
-	}
-
+	
 	String str = "Round,,";
 
-	for (int i = 0; i < position.length; i++) {
+	for (int i = index; i < numObjects; i+= numWorkers) {
 	    str += "Object " + i + ",,,";
 	}
 
 	str += "\n,,";
 
-	for (int i = 0; i < position.length; i++) {
+	for (int i = index; i < numObjects; i+= numWorkers) {
 	    str += "x,y,,";
 	}
 
@@ -136,8 +78,7 @@ public class ParallelHandler extends Thread {
 	} catch (IOException e) {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
-	}*/
-
+	}
     }
 
     public void calculateForces() {
@@ -152,13 +93,8 @@ public class ParallelHandler extends Thread {
 		if(dist <= bodySize) {
 		    System.out.println("");
 		    System.out.println("******COLLISION occurred between " + i + " and " + j + " *******");
-		    /*try {
-			collisionWriter.write("\n" + round + "," + i + "," + j + "," + dist + "," + position[i].getX() + "," + 
-				position[j].getX() + "," + position[i].getY() + "," + position[j].getY());
-		    } catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		    }*/
+		    writer.write(round -1, i, j, dist, position[i].getX(), position[j].getX(), position[i].getY(), position[j].getY());
+
 		    collisionCtr++;
 
 		    double deltax = position[j].getX() - position[i].getX();
@@ -206,8 +142,6 @@ public class ParallelHandler extends Thread {
 
 		    velocity[i].setLocation(v1fx, v1fy);
 		    velocity[j].setLocation(v2fx, v2fy);
-
-		    System.out.println("");
 		}
 
 		magnitude = (GRAV_CONSTANT * mass * mass) / Math.pow(dist, 2);
@@ -227,7 +161,6 @@ public class ParallelHandler extends Thread {
 		// System.out.println("---------------------");
 	    }
 	}
-	System.out.println("##########END###########");
     }
 
     public void moveBodies() {
@@ -284,7 +217,6 @@ public class ParallelHandler extends Thread {
 		}
 
 		velocity[i].setLocation(newXValue, newYValue);
-		System.out.println("Object " +i+ " is past x threshold and has been flipped.");
 	    } else if (isBreakYPlane) {
 		if (isBreakYPlaneHigh && yVelocity > 0) {
 		    newYValue = -1*newYValue;
@@ -292,7 +224,6 @@ public class ParallelHandler extends Thread {
 		    newYValue = -1*newYValue;
 		}
 		velocity[i].setLocation(newXValue, newYValue);
-		System.out.println("Object " +i+ " is past y threshold and has been flipped.");
 	    } else {
 		velocity[i].setLocation(newXValue, newYValue);
 	    }
@@ -346,28 +277,28 @@ public class ParallelHandler extends Thread {
 
 	    round++;
 
-	    //	    String str = "\n" + i + ",,";
+	    String str = "\n" + i + ",,";
 
-	    /* for (int j = 0; j < position.length; j++) {
+	    for (int j = index; j < position.length; j+= numWorkers) {
 		str += position[j].toString();
 		// System.out.println("Location for " + j + ": (" + position[j].getX() + ", " + position[j].getY() + ")");
-	    }*/
-	    /*try {
+	    }
+	    try {
 		positionWriter.write(str);
 	    } catch (IOException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
-	    }*/
+	    }
 	    // System.out.println("Location for 0: (" + position[0].getX() + ", " + position[0].getY() + ")");
 	    // System.out.println("Location for 1: (" + position[1].getX() + ", " + position[1].getY() + ")");
 	}
-	/*try {
+	try {
 	    positionWriter.close();
-	    collisionWriter.close();
 	} catch (IOException e) {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
-	}*/
-	System.out.println("Number of collisions: " + collisionCtr);
+	}
+	System.out.println("Number of collisions for worker " + index + ": " + collisionCtr);
+	writer.close();
     }
 }
