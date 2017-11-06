@@ -45,6 +45,12 @@ public class Point {
 	y += a;
     }
     
+    public String fileToString() {
+	DecimalFormat df = new DecimalFormat("#.##");
+	df.setRoundingMode(RoundingMode.CEILING);
+	return "\"(" + df.format(x) + "," + df.format(y) + ")\"";
+    }
+    
     public String toString() {
 	DecimalFormat df = new DecimalFormat("#.##");
 	df.setRoundingMode(RoundingMode.CEILING);

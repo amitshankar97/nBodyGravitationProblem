@@ -36,6 +36,7 @@ public class nBodyParrallel {
 	for (int i = 0; i < numWorkers; i++) {
 	    workerStage[i] = 1;
 	}
+	
 
 	Thread[] worker = new Thread[ numWorkers];
 
@@ -60,10 +61,11 @@ public class nBodyParrallel {
 
 	initializePosition(numBodies, bodySize);
 
+	nBodyVisual artist = new nBodyVisual(numWorkers, bodySize, numBodies, position);
 
 	for (int i = 0; i < numWorkers; i++) {
 	    worker[i] = new Thread(new ParallelHandler(numBodies, numTimeSteps,
-		    bodySize, i, numWorkers, countObject, writer, position, force, mass, velocity));
+		    bodySize, i, numWorkers, countObject, writer, position, force, mass, velocity, artist));
 	}
 
 	for (int i = 0; i < worker.length; i++) {

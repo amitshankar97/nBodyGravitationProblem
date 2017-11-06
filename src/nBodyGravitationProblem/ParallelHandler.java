@@ -3,6 +3,7 @@ package nBodyGravitationProblem;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Random;
 
 public class ParallelHandler extends Thread {
@@ -13,7 +14,7 @@ public class ParallelHandler extends Thread {
     final double GRAV_CONSTANT = 6.67 * (10^(-11));
     int PLANE_SIZE = 0;
 
-    final double timeStep = 1;
+    final double timeStep = .1;
     private Random rand = new Random();
     private Point position[];
     private Point velocity[];
@@ -22,7 +23,6 @@ public class ParallelHandler extends Thread {
     private double radius;
 
     private int numWorkers;
-
     private int index;
     private int round = 0;
 
@@ -31,12 +31,13 @@ public class ParallelHandler extends Thread {
     private int collisionCtr = 0;
     private Count countObject;
     private WriteMonitor writer;
+    private nBodyVisual artist;
 
     // private int spacingBetweenColumns;
 
     public ParallelHandler(int numObjects, int numTimeSteps, double bodySize, int index,
 	    int numWorkers, Count countObject, WriteMonitor writer, Point position[],
-	    Point[][] force, double mass, Point[] velocity) {
+	    Point[][] force, double mass, Point[] velocity, nBodyVisual artist) {
 	this.numObjects = numObjects;
 	this.numTimeSteps = numTimeSteps;
 	this.bodySize = bodySize;
@@ -47,7 +48,7 @@ public class ParallelHandler extends Thread {
 	this.position = position;
 	this.force = force;
 	this.mass = mass;
-
+	this.artist = artist;
 	PLANE_SIZE = (int) (numObjects * bodySize * 2);
 
 	this.velocity = velocity;
@@ -60,7 +61,7 @@ public class ParallelHandler extends Thread {
 	} catch(IOException e) {
 	    e.printStackTrace();
 	}
-	
+
 	String str = "Round,,";
 
 	for (int i = index; i < numObjects; i+= numWorkers) {
@@ -79,6 +80,7 @@ public class ParallelHandler extends Thread {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
 	}
+
     }
 
     public void calculateForces() {
@@ -96,6 +98,7 @@ public class ParallelHandler extends Thread {
 		    writer.write(round -1, i, j, dist, position[i].getX(), position[j].getX(), position[i].getY(), position[j].getY());
 
 		    collisionCtr++;
+		    artist.newCollision(i, j);
 
 		    double deltax = position[j].getX() - position[i].getX();
 		    double deltay = position[j].getY() - position[i].getY();
@@ -241,39 +244,19 @@ public class ParallelHandler extends Thread {
 	}
     }
 
-    /*public void barrier() {
-	int stage = 1;
-	while(stage < numWorkers) {
-	    sems[index].release();
-	    while(true) {
-		if(stages[(index + stage) % numWorkers] >= stage) {
-		    try {
-			sems[(index+stage) % numWorkers].acquire();
-		    } catch(InterruptedException ie) {
-			ie.printStackTrace();
-		    }
-		    break;
-		}
-		else
-		    continue;
-	    }
-	    stage *= 2;
-	    synchronized(ParallelHandler.class) {
-		stages[index] = stage;
-	    }
-	}
-    }*/
-
     public synchronized void barrier() {
 	countObject.increment();
     }
 
     public void run() {
+	writer.start();
 	for (int i = 0; i < numTimeSteps; i++) {
 	    calculateForces();
 	    barrier();
 	    moveBodies();
 	    barrier();
+
+	    artist.draw(position);
 
 	    round++;
 
@@ -281,7 +264,6 @@ public class ParallelHandler extends Thread {
 
 	    for (int j = index; j < position.length; j+= numWorkers) {
 		str += position[j].toString();
-		// System.out.println("Location for " + j + ": (" + position[j].getX() + ", " + position[j].getY() + ")");
 	    }
 	    try {
 		positionWriter.write(str);
@@ -289,8 +271,6 @@ public class ParallelHandler extends Thread {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	    }
-	    // System.out.println("Location for 0: (" + position[0].getX() + ", " + position[0].getY() + ")");
-	    // System.out.println("Location for 1: (" + position[1].getX() + ", " + position[1].getY() + ")");
 	}
 	try {
 	    positionWriter.close();
@@ -298,6 +278,8 @@ public class ParallelHandler extends Thread {
 	    // TODO Auto-generated catch block
 	    e.printStackTrace();
 	}
+	writer.finish(collisionCtr);
+	writer.printResults(numObjects, position, velocity);
 	System.out.println("Number of collisions for worker " + index + ": " + collisionCtr);
 	writer.close();
     }
